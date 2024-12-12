@@ -1,6 +1,8 @@
 import random
 from docx import Document
 import customtkinter as ctk
+import tkinter as tk
+from tkinter import ttk
 
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
@@ -25,7 +27,7 @@ def center_window(win, width=None, height=None):
 
 root = ctk.CTk()
 root.title("Тестирование")
-root.geometry("500x300")
+root.geometry("900x600")
 center_window(root, 500, 300)
 
 
@@ -82,6 +84,7 @@ class TestWindow(ctk.CTkToplevel):
         self.current_question = 0
         self.score = 0
         self.results = []
+        self.time_remaining = 50 * 60  # 50 минут в секундах
 
         self.title("Тестирование")
         self.geometry("600x400")
@@ -89,27 +92,52 @@ class TestWindow(ctk.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self.close_test)
 
         self.create_widgets()
+        self.start_timer()
         self.show_question()
 
     def center_window(self):
-        center_window(self, 600, 400)
+        center_window(self, 1300, 700)
 
     def create_widgets(self):
         self.main_frame = ctk.CTkFrame(self, corner_radius=15)
         self.main_frame.pack(expand=True, fill="both", padx=20, pady=20)
 
-        self.question_label = ctk.CTkLabel(self.main_frame, text="", wraplength=550, justify="left", font=("Arial", 14, "bold"))
+        self.timer_label = ctk.CTkLabel(self.main_frame, text="", font=("Arial", 20, "bold"), text_color="red")
+        self.timer_label.pack(pady=5)
+
+        self.question_label = ctk.CTkLabel(self.main_frame, text="", wraplength=1000, justify="left", font=("Arial", 14, "bold"))
         self.question_label.pack(pady=10)
 
         self.options_frame = ctk.CTkFrame(self.main_frame, corner_radius=10)
         self.options_frame.pack(pady=10, fill="x")
 
-        self.next_button = ctk.CTkButton(self.main_frame, text="Далее", command=self.next_question)
+        self.next_button = ctk.CTkButton(
+            self.main_frame,
+            text="Далее",
+            font=("Arial", 16),  # Увеличенный шрифт текста на кнопке
+            command=self.next_question,
+            width=200,  # Увеличенная ширина кнопки
+            height=50  # Увеличенная высота кнопки
+        )
         self.next_button.pack(pady=10)
+
+    def start_timer(self):
+        def update_timer():
+            if self.time_remaining > 0:
+                mins, secs = divmod(self.time_remaining, 60)
+                timer_text = f"Оставшееся время: {mins:02d}:{secs:02d}"
+                self.timer_label.configure(text=timer_text)
+                self.time_remaining -= 1
+                self.after(1000, update_timer)
+            else:
+                self.finish_test()
+
+        update_timer()
 
     def show_question(self):
         question = self.questions[self.current_question]
-        self.question_label.configure(text=question["question"])
+        question_number = f"Вопрос {self.current_question + 1} из {len(self.questions)}:"
+        self.question_label.configure(text=f"{question_number}\n\n{question['question']}", font=("Arial", 18, "bold"))
 
         for widget in self.options_frame.winfo_children():
             widget.destroy()
@@ -123,9 +151,35 @@ class TestWindow(ctk.CTkToplevel):
             self.correct_index = 0
 
         self.selected_answer = ctk.IntVar(value=-1)
+
         for i, variant in enumerate(self.variants):
-            rb = ctk.CTkRadioButton(self.options_frame, text=variant, variable=self.selected_answer, value=i, font=("Arial", 12))
-            rb.pack(anchor="w", padx=20, pady=5)
+            # Создаем строку с радиокнопкой и текстовым блоком
+            row_frame = ctk.CTkFrame(self.options_frame)
+            row_frame.pack(fill="x", padx=10, pady=10)
+
+            # Радиокнопка для выбора варианта
+            rb = tk.Radiobutton(
+                row_frame,
+                variable=self.selected_answer,
+                value=i,
+                font=("Arial", 55)  # Увеличьте размер шрифта
+            )
+
+            rb.pack(side="left", padx=10, pady=10)
+
+            # Текстовое поле для варианта ответа
+            textbox = ctk.CTkTextbox(
+                row_frame,
+                wrap="word",
+                height=100,  # Увеличенная высота
+                width=900  # Увеличенная ширина
+            )
+            textbox.insert("1.0", variant)
+            textbox.configure(
+                state="disabled",  # Только для чтения
+                font=("Arial", 22)  # Размер шрифта для текста варианта
+            )
+            textbox.pack(side="left", fill="x", expand=True, padx=10)
 
     def next_question(self):
         selected_index = self.selected_answer.get()
@@ -155,7 +209,7 @@ class TestWindow(ctk.CTkToplevel):
         results_window = ctk.CTkToplevel(root)
         results_window.title("Детали теста")
         results_window.geometry("700x500")
-        self.center_results_window(results_window)
+        center_window(results_window, 700, 500)
 
         results_frame = ctk.CTkFrame(results_window, corner_radius=15)
         results_frame.pack(expand=True, fill="both", padx=20, pady=20)
@@ -167,42 +221,34 @@ class TestWindow(ctk.CTkToplevel):
         results_text.pack(expand=True, fill="both", padx=10, pady=10)
         results_text.configure(font=("Arial", 12))
 
-        # Настраиваем теги
-        results_text.tag_config("question", foreground="#000000", underline=1)
-        results_text.tag_config("selected", foreground="#555555")
-        results_text.tag_config("correct", foreground="#2E8B57")
-        results_text.tag_config("correct_info", foreground="#008000")
-        results_text.tag_config("wrong_info", foreground="#B22222")
-        results_text.tag_config("separator", foreground="#888888")
-
         correct_count = sum(r['is_correct'] for r in self.results)
         total_count = len(self.results)
         percentage = (correct_count / total_count) * 100 if total_count > 0 else 0
+        results_text.insert("end",
+                            f"Вы ответили правильно на {correct_count} из {total_count} вопросов ({percentage:.2f}%)\n")
+        results_text.insert("end", "-" * 50 + "\n\n")
 
         for i, result in enumerate(self.results):
             results_text.insert("end", f"Вопрос {i + 1}: {result['question']}\n", "question")
-            results_text.insert("end", f"    Выбранный ответ: {result['selected']}\n", "selected")
-            results_text.insert("end", f"    Правильный ответ: {result['correct']}\n", "correct")
+            results_text.insert("end", f"  Ваш ответ: {result['selected']}\n", "selected")
+            results_text.insert("end", f"  Правильный ответ: {result['correct']}\n", "correct")
             if result['is_correct']:
-                results_text.insert("end", "    Правильно!\n", "correct_info")
+                results_text.insert("end", "  Результат: Правильно\n\n", "correct_info")
             else:
-                results_text.insert("end", "    Неправильно!\n", "wrong_info")
+                results_text.insert("end", "  Результат: Неправильно\n\n", "wrong_info")
+            results_text.insert("end", "-" * 50 + "\n\n")
 
-            if i < len(self.results) - 1:
-                results_text.insert("end", "\n" + "-" * 50 + "\n\n", "separator")
-            else:
-                results_text.insert("end", "\n")
+        results_text.tag_config("question", foreground="black", underline=1)
+        results_text.tag_config("selected", foreground="#555555")
+        results_text.tag_config("correct", foreground="green")
+        results_text.tag_config("correct_info", foreground="darkgreen")
+        results_text.tag_config("wrong_info", foreground="red")
 
-        # Итоги по процентам
-        results_text.insert("end", f"\nВы ответили правильно на {correct_count} из {total_count} вопросов ({percentage:.2f}%)\n")
         results_text.configure(state="disabled")
 
         close_button = ctk.CTkButton(results_frame, text="Закрыть",
                                      command=lambda: self.close_results_window(results_window))
         close_button.pack(pady=10)
-
-    def center_results_window(self, window):
-        center_window(window, 700, 500)
 
     def close_results_window(self, results_window):
         results_window.destroy()
@@ -214,7 +260,6 @@ class TestWindow(ctk.CTkToplevel):
         self.destroy()
 
 
-# Главное окно
 main_frame = ctk.CTkFrame(root, corner_radius=15)
 main_frame.pack(expand=True, fill="both", padx=20, pady=20)
 
