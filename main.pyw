@@ -105,21 +105,42 @@ class TestWindow(ctk.CTkToplevel):
         self.timer_label = ctk.CTkLabel(self.main_frame, text="", font=("Arial", 20, "bold"), text_color="red")
         self.timer_label.pack(pady=5)
 
-        self.question_label = ctk.CTkLabel(self.main_frame, text="", wraplength=1000, justify="left", font=("Arial", 14, "bold"))
+        self.question_label = ctk.CTkLabel(self.main_frame, text="", wraplength=1000, justify="left",
+                                           font=("Arial", 14, "bold"))
         self.question_label.pack(pady=10)
 
         self.options_frame = ctk.CTkFrame(self.main_frame, corner_radius=10)
         self.options_frame.pack(pady=10, fill="x")
 
+        # Рамка для кнопок "Далее" и "Показать правильный ответ"
+        buttons_frame = ctk.CTkFrame(self.main_frame, corner_radius=10)
+        buttons_frame.pack(pady=10, fill="x", side="bottom")
+
         self.next_button = ctk.CTkButton(
-            self.main_frame,
+            buttons_frame,
             text="Далее",
-            font=("Arial", 16),  # Увеличенный шрифт текста на кнопке
+            font=("Arial", 16),
             command=self.next_question,
-            width=200,  # Увеличенная ширина кнопки
-            height=50  # Увеличенная высота кнопки
+            width=200,
+            height=50
         )
-        self.next_button.pack(pady=10)
+        self.next_button.pack(side="left", padx=10)
+
+        # Добавляем кнопку "Показать правильный ответ"
+        self.show_answer_button = ctk.CTkButton(
+            buttons_frame,
+            text="Показать ответ",
+            font=("Arial", 16),
+            command=self.show_correct_answer,
+            width=200,
+            height=50
+        )
+        self.show_answer_button.pack(side="right", padx=10)
+
+    def show_correct_answer(self):
+        correct_answer = self.questions[self.current_question]["variants"][
+            0]  # Предполагаем, что правильный ответ всегда первый
+        tk.messagebox.showinfo("Правильный ответ", f"Правильный ответ: {correct_answer}")
 
     def start_timer(self):
         def update_timer():
