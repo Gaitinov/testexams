@@ -206,28 +206,47 @@ class TestWindow(ctk.CTkToplevel):
 
     def finish_test(self):
         self.withdraw()
-        results_window = ctk.CTkToplevel(root)
+        results_window = tk.Toplevel(root)
         results_window.title("Детали теста")
-        results_window.geometry("700x500")
-        center_window(results_window, 700, 500)
+        results_window.geometry("900x700")
+        center_window(results_window, 900, 700)
 
-        results_frame = ctk.CTkFrame(results_window, corner_radius=15)
+        results_frame = tk.Frame(results_window, bg="white", bd=2, relief="groove")
         results_frame.pack(expand=True, fill="both", padx=20, pady=20)
 
-        title_label = ctk.CTkLabel(results_frame, text="Результаты теста", font=("Arial", 18, "bold"))
-        title_label.pack(pady=(10, 20))
+        title_label = tk.Label(
+            results_frame,
+            text="Результаты теста",
+            font=("Arial", 22, "bold"),
+            bg="white",
+            fg="black"
+        )
+        title_label.pack(pady=(20, 20))
 
-        results_text = ctk.CTkTextbox(results_frame, wrap="word")
+        results_text = tk.Text(
+            results_frame,
+            wrap="word",
+            font=("Arial", 16),  # Увеличенный шрифт
+            height=25,
+            width=80,
+            padx=10,
+            pady=10
+        )
         results_text.pack(expand=True, fill="both", padx=10, pady=10)
-        results_text.configure(font=("Arial", 12))
 
         correct_count = sum(r['is_correct'] for r in self.results)
         total_count = len(self.results)
         percentage = (correct_count / total_count) * 100 if total_count > 0 else 0
-        results_text.insert("end",
-                            f"Вы ответили правильно на {correct_count} из {total_count} вопросов ({percentage:.2f}%)\n")
-        results_text.insert("end", "-" * 50 + "\n\n")
 
+        # Добавляем итоговую информацию
+        results_text.insert(
+            "end",
+            f"Вы ответили правильно на {correct_count} из {total_count} вопросов ({percentage:.2f}%)\n\n",
+            "header"
+        )
+        results_text.insert("end", "=" * 50 + "\n\n")
+
+        # Добавляем детали для каждого вопроса
         for i, result in enumerate(self.results):
             results_text.insert("end", f"Вопрос {i + 1}: {result['question']}\n", "question")
             results_text.insert("end", f"  Ваш ответ: {result['selected']}\n", "selected")
@@ -238,17 +257,24 @@ class TestWindow(ctk.CTkToplevel):
                 results_text.insert("end", "  Результат: Неправильно\n\n", "wrong_info")
             results_text.insert("end", "-" * 50 + "\n\n")
 
-        results_text.tag_config("question", foreground="black", underline=1)
-        results_text.tag_config("selected", foreground="#555555")
-        results_text.tag_config("correct", foreground="green")
-        results_text.tag_config("correct_info", foreground="darkgreen")
-        results_text.tag_config("wrong_info", foreground="red")
+        # Настройка тегов для цветового выделения
+        results_text.tag_config("header", foreground="black", font=("Arial", 18, "bold"))
+        results_text.tag_config("question", foreground="black", font=("Arial", 16, "italic"))
+        results_text.tag_config("selected", foreground="blue", font=("Arial", 16))
+        results_text.tag_config("correct", foreground="green", font=("Arial", 16))
+        results_text.tag_config("correct_info", foreground="darkgreen", font=("Arial", 16, "bold"))
+        results_text.tag_config("wrong_info", foreground="red", font=("Arial", 16, "bold"))
 
-        results_text.configure(state="disabled")
+        # Оставляем текст доступным для копирования
+        results_text.configure(state="normal")
 
-        close_button = ctk.CTkButton(results_frame, text="Закрыть",
-                                     command=lambda: self.close_results_window(results_window))
-        close_button.pack(pady=10)
+        close_button = tk.Button(
+            results_frame,
+            text="Закрыть",
+            font=("Arial", 18),
+            command=lambda: self.close_results_window(results_window)
+        )
+        close_button.pack(pady=20)
 
     def close_results_window(self, results_window):
         results_window.destroy()
