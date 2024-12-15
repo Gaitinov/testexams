@@ -2,7 +2,9 @@ import random
 from docx import Document
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
+from tkinter import filedialog
+
 
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
@@ -65,15 +67,48 @@ def start_test():
         if not questions:
             raise ValueError("В файле нет вопросов или они неверно отформатированы.")
     except ValueError as ve:
-        ctk.CTkMessagebox.show_error("Ошибка", f"Некорректное значение: {ve}")
+        messagebox.showerror("Ошибка", f"Некорректное значение: {ve}")
         return
     except Exception as e:
-        ctk.CTkMessagebox.show_error("Ошибка", f"Не удалось загрузить вопросы: {e}")
+        messagebox.showerror("Ошибка", f"Не удалось загрузить вопросы: {e}")
         return
 
     shuffled_questions = random.sample(questions, k=min(num_questions, len(questions)))
     root.withdraw()
     TestWindow(shuffled_questions, shuffle_answers_var.get())
+
+
+def export_incorrect_answers(results):
+    # Фильтруем только неправильные ответы
+    incorrect_results = [r for r in results if not r["is_correct"]]
+    if not incorrect_results:
+        messagebox.showinfo("Информация", "Нет неправильных ответов для экспорта.")
+        return
+
+    # Открываем файловый диалог для выбора пути сохранения
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".docx",
+        filetypes=[("Word Documents", "*.docx"), ("All Files", "*.*")],
+        title="Сохранить файл как"
+    )
+    if not file_path:  # Если пользователь закрыл диалог без выбора
+        return
+
+    # Создаем документ Word
+    document = Document()
+    document.add_heading("Неправильные ответы", level=1)
+
+    for result in incorrect_results:
+        document.add_heading(result["question"], level=2)
+        document.add_paragraph(f"{result['correct']}")
+
+    # Сохраняем файл по указанному пути
+    try:
+        document.save(file_path)
+        messagebox.showinfo("Экспорт завершен", f"Файл успешно сохранен: {file_path}")
+    except Exception as e:
+        messagebox.showerror("Ошибка", f"Не удалось сохранить файл: {e}")
+
 
 
 class TestWindow(ctk.CTkToplevel):
@@ -112,7 +147,6 @@ class TestWindow(ctk.CTkToplevel):
         self.options_frame = ctk.CTkFrame(self.main_frame, corner_radius=10)
         self.options_frame.pack(pady=10, fill="x")
 
-        # Рамка для кнопок "Далее" и "Показать правильный ответ"
         buttons_frame = ctk.CTkFrame(self.main_frame, corner_radius=10)
         buttons_frame.pack(pady=10, fill="x", side="bottom")
 
@@ -126,7 +160,6 @@ class TestWindow(ctk.CTkToplevel):
         )
         self.next_button.pack(side="left", padx=10)
 
-        # Добавляем кнопку "Показать правильный ответ"
         self.show_answer_button = ctk.CTkButton(
             buttons_frame,
             text="Показать ответ",
@@ -138,9 +171,8 @@ class TestWindow(ctk.CTkToplevel):
         self.show_answer_button.pack(side="right", padx=10)
 
     def show_correct_answer(self):
-        correct_answer = self.questions[self.current_question]["variants"][
-            0]  # Предполагаем, что правильный ответ всегда первый
-        tk.messagebox.showinfo("Правильный ответ", f"Правильный ответ: {correct_answer}")
+        correct_answer = self.questions[self.current_question]["variants"][0]
+        messagebox.showinfo("Правильный ответ", f"Правильный ответ: {correct_answer}")
 
     def start_timer(self):
         def update_timer():
@@ -174,43 +206,37 @@ class TestWindow(ctk.CTkToplevel):
         self.selected_answer = ctk.IntVar(value=-1)
 
         for i, variant in enumerate(self.variants):
-            # Создаем строку с радиокнопкой и текстовым блоком
             row_frame = ctk.CTkFrame(self.options_frame)
             row_frame.pack(fill="x", padx=10, pady=10)
 
-            # Радиокнопка для выбора варианта
             rb = tk.Radiobutton(
                 row_frame,
                 variable=self.selected_answer,
                 value=i,
-                font=("Arial", 55)  # Увеличьте размер шрифта
+                font=("Arial", 55)
             )
-
             rb.pack(side="left", padx=10, pady=10)
 
-            # Текстовое поле для варианта ответа
             textbox = ctk.CTkTextbox(
                 row_frame,
                 wrap="word",
-                height=100,  # Увеличенная высота
-                width=900  # Увеличенная ширина
+                height=100,
+                width=900
             )
             textbox.insert("1.0", variant)
-            textbox.configure(
-                state="disabled",  # Только для чтения
-                font=("Arial", 22)  # Размер шрифта для текста варианта
-            )
+            textbox.configure(state="disabled", font=("Arial", 22))
             textbox.pack(side="left", fill="x", expand=True, padx=10)
 
     def next_question(self):
         selected_index = self.selected_answer.get()
         if selected_index == -1:
-            ctk.CTkMessagebox.show_warning("Внимание", "Выберите ответ!")
+            messagebox.showwarning("Внимание", "Выберите ответ!")
             return
 
         is_correct = (selected_index == self.correct_index)
         self.results.append({
             "question": self.questions[self.current_question]["question"],
+            "variants": self.questions[self.current_question]["variants"],  # Сохраняем оригинальные варианты
             "selected": self.variants[selected_index],
             "correct": self.variants[self.correct_index],
             "is_correct": is_correct
@@ -227,6 +253,17 @@ class TestWindow(ctk.CTkToplevel):
 
     def finish_test(self):
         self.withdraw()
+
+        incorrect_results = [r for r in self.results if not r["is_correct"]]
+        incorrect_questions = [
+            {
+                "question": r["question"],
+                "variants": r["variants"],
+                "correct_index": r["variants"].index(r["correct"])
+            }
+            for r in incorrect_results
+        ]
+
         results_window = tk.Toplevel(root)
         results_window.title("Детали теста")
         results_window.geometry("900x700")
@@ -247,7 +284,7 @@ class TestWindow(ctk.CTkToplevel):
         results_text = tk.Text(
             results_frame,
             wrap="word",
-            font=("Arial", 16),  # Увеличенный шрифт
+            font=("Arial", 16),
             height=25,
             width=80,
             padx=10,
@@ -259,7 +296,6 @@ class TestWindow(ctk.CTkToplevel):
         total_count = len(self.results)
         percentage = (correct_count / total_count) * 100 if total_count > 0 else 0
 
-        # Добавляем итоговую информацию
         results_text.insert(
             "end",
             f"Вы ответили правильно на {correct_count} из {total_count} вопросов ({percentage:.2f}%)\n\n",
@@ -267,7 +303,6 @@ class TestWindow(ctk.CTkToplevel):
         )
         results_text.insert("end", "=" * 50 + "\n\n")
 
-        # Добавляем детали для каждого вопроса
         for i, result in enumerate(self.results):
             results_text.insert("end", f"Вопрос {i + 1}: {result['question']}\n", "question")
             results_text.insert("end", f"  Ваш ответ: {result['selected']}\n", "selected")
@@ -278,24 +313,46 @@ class TestWindow(ctk.CTkToplevel):
                 results_text.insert("end", "  Результат: Неправильно\n\n", "wrong_info")
             results_text.insert("end", "-" * 50 + "\n\n")
 
-        # Настройка тегов для цветового выделения
         results_text.tag_config("header", foreground="black", font=("Arial", 18, "bold"))
         results_text.tag_config("question", foreground="black", font=("Arial", 16, "italic"))
         results_text.tag_config("selected", foreground="blue", font=("Arial", 16))
         results_text.tag_config("correct", foreground="green", font=("Arial", 16))
         results_text.tag_config("correct_info", foreground="darkgreen", font=("Arial", 16, "bold"))
         results_text.tag_config("wrong_info", foreground="red", font=("Arial", 16, "bold"))
-
-        # Оставляем текст доступным для копирования
         results_text.configure(state="normal")
 
+        buttons_frame = tk.Frame(results_frame, bg="white")
+        buttons_frame.pack(pady=10)
+
+        export_button = tk.Button(
+            buttons_frame,
+            text="Экспортировать неправильные ответы",
+            font=("Arial", 14),
+            command=lambda: export_incorrect_answers(self.results)
+        )
+        export_button.pack(side="left", padx=10)
+
+        if incorrect_results:
+            retry_button = tk.Button(
+                buttons_frame,
+                text="Пройти заново (ошибки)",
+                font=("Arial", 14),
+                command=lambda: self.retry_with_incorrect(incorrect_questions, results_window)
+            )
+            retry_button.pack(side="left", padx=10)
+
         close_button = tk.Button(
-            results_frame,
+            buttons_frame,
             text="Закрыть",
-            font=("Arial", 18),
+            font=("Arial", 14),
             command=lambda: self.close_results_window(results_window)
         )
-        close_button.pack(pady=20)
+        close_button.pack(side="left", padx=10)
+
+    def retry_with_incorrect(self, incorrect_questions, results_window):
+        results_window.destroy()
+        self.destroy()
+        TestWindow(incorrect_questions, self.shuffle_answers)
 
     def close_results_window(self, results_window):
         results_window.destroy()
