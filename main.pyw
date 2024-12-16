@@ -122,7 +122,7 @@ class TestWindow(ctk.CTkToplevel):
         self.time_remaining = 50 * 60  # 50 минут в секундах
 
         self.title("Тестирование")
-        self.geometry("600x400")
+        self.geometry("1920x1080")
         self.center_window()
         self.protocol("WM_DELETE_WINDOW", self.close_test)
 
@@ -131,7 +131,7 @@ class TestWindow(ctk.CTkToplevel):
         self.show_question()
 
     def center_window(self):
-        center_window(self, 1300, 700)
+        center_window(self, 1920, 1080)
 
     def create_widgets(self):
         self.main_frame = ctk.CTkFrame(self, corner_radius=15)
@@ -213,7 +213,7 @@ class TestWindow(ctk.CTkToplevel):
                 row_frame,
                 variable=self.selected_answer,
                 value=i,
-                font=("Arial", 55)
+                font=("Arial", 50)
             )
             rb.pack(side="left", padx=10, pady=10)
 
@@ -221,7 +221,7 @@ class TestWindow(ctk.CTkToplevel):
                 row_frame,
                 wrap="word",
                 height=100,
-                width=900
+                width=800
             )
             textbox.insert("1.0", variant)
             textbox.configure(state="disabled", font=("Arial", 22))
@@ -265,9 +265,9 @@ class TestWindow(ctk.CTkToplevel):
         ]
 
         results_window = tk.Toplevel(root)
-        results_window.title("Детали теста")
-        results_window.geometry("900x700")
-        center_window(results_window, 900, 700)
+        results_window.title("Результаты теста")
+        results_window.geometry("1600x900")
+        center_window(results_window, 1600, 900)
 
         results_frame = tk.Frame(results_window, bg="white", bd=2, relief="groove")
         results_frame.pack(expand=True, fill="both", padx=20, pady=20)
@@ -332,7 +332,15 @@ class TestWindow(ctk.CTkToplevel):
         )
         export_button.pack(side="left", padx=10)
 
-        if incorrect_results:
+        retry_all_button = tk.Button(
+            buttons_frame,
+            text="Пройти заново (все вопросы)",
+            font=("Arial", 14),
+            command=lambda: self.retry_with_all_questions(results_window)
+        )
+        retry_all_button.pack(side="left", padx=10)
+
+        if incorrect_questions:
             retry_button = tk.Button(
                 buttons_frame,
                 text="Пройти заново (ошибки)",
@@ -348,6 +356,11 @@ class TestWindow(ctk.CTkToplevel):
             command=lambda: self.close_results_window(results_window)
         )
         close_button.pack(side="left", padx=10)
+
+    def retry_with_all_questions(self, results_window):
+        results_window.destroy()
+        self.destroy()
+        TestWindow(self.questions, self.shuffle_answers)
 
     def retry_with_incorrect(self, incorrect_questions, results_window):
         results_window.destroy()
