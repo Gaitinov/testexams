@@ -30,7 +30,7 @@ def center_window(win, width=None, height=None):
 root = ctk.CTk()
 root.title("Тестирование")
 root.geometry("900x600")
-center_window(root, 500, 300)
+center_window(root, 600, 350)
 
 
 def parse_questions(file_name):
@@ -56,6 +56,11 @@ def parse_questions(file_name):
 
 def start_test():
     try:
+        time_limit_str = time_limit_var.get().strip()
+        if not time_limit_str.isdigit():
+            time_limit = 50
+        else:
+            time_limit = int(time_limit_str)
         num_questions_str = question_count_var.get().strip()
         if not num_questions_str.isdigit():
             raise ValueError("Введите число.")
@@ -75,7 +80,7 @@ def start_test():
 
     shuffled_questions = random.sample(questions, k=min(num_questions, len(questions)))
     root.withdraw()
-    TestWindow(shuffled_questions, shuffle_answers_var.get())
+    TestWindow(shuffled_questions, shuffle_answers_var.get(), time_limit)
 
 
 def export_incorrect_answers(results):
@@ -112,14 +117,14 @@ def export_incorrect_answers(results):
 
 
 class TestWindow(ctk.CTkToplevel):
-    def __init__(self, questions, shuffle_answers):
+    def __init__(self, questions, shuffle_answers, time_limit):
         super().__init__()
         self.questions = questions
         self.shuffle_answers = shuffle_answers
         self.current_question = 0
         self.score = 0
         self.results = []
-        self.time_remaining = 50 * 60  # 50 минут в секундах
+        self.time_remaining = time_limit * 60
 
         self.title("Тестирование")
         self.geometry("1920x1080")
@@ -360,12 +365,12 @@ class TestWindow(ctk.CTkToplevel):
     def retry_with_all_questions(self, results_window):
         results_window.destroy()
         self.destroy()
-        TestWindow(self.questions, self.shuffle_answers)
+        TestWindow(self.questions, self.shuffle_answers, 50)
 
     def retry_with_incorrect(self, incorrect_questions, results_window):
         results_window.destroy()
         self.destroy()
-        TestWindow(incorrect_questions, self.shuffle_answers)
+        TestWindow(incorrect_questions, self.shuffle_answers, 50)
 
     def close_results_window(self, results_window):
         results_window.destroy()
@@ -391,6 +396,12 @@ ctk.CTkLabel(input_frame, text="Количество вопросов:", font=("
 question_count_var = ctk.StringVar(value="25")
 question_count_entry = ctk.CTkEntry(input_frame, textvariable=question_count_var, width=100)
 question_count_entry.grid(row=0, column=1, padx=10, pady=10)
+
+ctk.CTkLabel(input_frame, text="Время (минуты):", font=("Arial", 14)).grid(row=2, column=0, padx=10, pady=10, sticky="e")
+
+time_limit_var = ctk.StringVar(value="50")
+time_limit_entry = ctk.CTkEntry(input_frame, textvariable=time_limit_var, width=100)
+time_limit_entry.grid(row=2, column=1, padx=10, pady=10)
 
 ctk.CTkLabel(input_frame, text="Перемешивать варианты ответов?", font=("Arial", 14)).grid(row=1, column=0, padx=10, pady=10, sticky="e")
 
