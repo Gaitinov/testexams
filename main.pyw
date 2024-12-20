@@ -452,13 +452,15 @@ class TestWindow(ctk.CTkToplevel):
         TestWindow(incorrect_questions, self.shuffle_answers, 50)
 
     def close_results_window(self, results_window):
-        results_window.destroy()
-        root.deiconify()
-        self.destroy()
+        if messagebox.askyesno("Подтверждение", "Вы действительно хотите завершить тестирование?"):
+            results_window.destroy()
+            root.deiconify()
+            self.destroy()
 
     def close_test(self):
-        root.deiconify()
-        self.destroy()
+        if messagebox.askyesno("Подтверждение", "Вы действительно хотите завершить тестирование?"):
+            root.deiconify()
+            self.destroy()
 
 
 main_frame = ctk.CTkFrame(root, corner_radius=15)
