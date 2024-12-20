@@ -30,7 +30,37 @@ def center_window(win, width=None, height=None):
 root = ctk.CTk()
 root.title("Тестирование")
 root.geometry("900x600")
-center_window(root, 600, 350)
+center_window(root, 600, 400)
+
+
+def start_test_with_incorrect_questions():
+    file_path = filedialog.askopenfilename(
+        defaultextension=".docx",
+        filetypes=[("Word Documents", "*.docx"), ("All Files", "*.*")],
+        title="Выберите файл с вопросами для теста"
+    )
+    if not file_path:
+        return  # Пользователь закрыл диалог
+
+    try:
+        questions = parse_questions(file_path)
+        if not questions:
+            raise ValueError("Файл не содержит вопросов или он неверно отформатирован.")
+    except Exception as e:
+        messagebox.showerror("Ошибка", f"Не удалось загрузить вопросы: {e}")
+        return
+
+    # Проверка перемешивания
+    shuffle_questions = shuffle_answers_var.get()
+
+    # Если нужно перемешивать вопросы
+    if shuffle_questions:
+        questions = random.sample(questions, len(questions))
+
+    # Запуск теста с загруженными вопросами
+    root.withdraw()
+    TestWindow(questions, shuffle_answers_var.get(), 50)
+
 
 
 def parse_questions(file_name):
@@ -83,6 +113,39 @@ def start_test():
     TestWindow(shuffled_questions, shuffle_answers_var.get(), time_limit)
 
 
+def export_incorrect_questions_as_original_format(results):
+    # Фильтруем только неправильные ответы
+    incorrect_results = [r for r in results if not r["is_correct"]]
+    if not incorrect_results:
+        messagebox.showinfo("Информация", "Нет неправильных ответов для экспорта.")
+        return
+
+    # Открываем файловый диалог для выбора пути сохранения
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".docx",
+        filetypes=[("Word Documents", "*.docx"), ("All Files", "*.*")],
+        title="Сохранить файл как"
+    )
+    if not file_path:  # Если пользователь закрыл диалог без выбора
+        return
+
+    # Создаем документ Word
+    document = Document()
+
+    # Форматируем вопросы и варианты в оригинальном стиле
+    for result in incorrect_results:
+        document.add_paragraph(f"<question> {result['question']}")
+        for variant in result["variants"]:
+            document.add_paragraph(f"<variant> {variant}")
+
+    # Сохраняем файл по указанному пути
+    try:
+        document.save(file_path)
+        messagebox.showinfo("Экспорт завершен", f"Файл успешно сохранен: {file_path}")
+    except Exception as e:
+        messagebox.showerror("Ошибка", f"Не удалось сохранить файл: {e}")
+
+
 def export_incorrect_answers(results):
     # Фильтруем только неправильные ответы
     incorrect_results = [r for r in results if not r["is_correct"]]
@@ -127,7 +190,7 @@ class TestWindow(ctk.CTkToplevel):
         self.time_remaining = time_limit * 60
 
         self.title("Тестирование")
-        self.geometry("1920x1080")
+        self.geometry("1920x1000")
         self.center_window()
         self.protocol("WM_DELETE_WINDOW", self.close_test)
 
@@ -136,7 +199,7 @@ class TestWindow(ctk.CTkToplevel):
         self.show_question()
 
     def center_window(self):
-        center_window(self, 1920, 1080)
+        center_window(self, 1920, 1000)
 
     def create_widgets(self):
         self.main_frame = ctk.CTkFrame(self, corner_radius=15)
@@ -201,8 +264,15 @@ class TestWindow(ctk.CTkToplevel):
             widget.destroy()
 
         self.variants = question["variants"][:]
+        if not self.variants:
+            print(f"Ошибка: Вопрос {self.current_question + 1} не имеет вариантов ответа.")
+            raise ValueError("Вопрос не имеет вариантов ответа.")
+
         if self.shuffle_answers:
             original_variants = self.variants[:]
+            if not original_variants:  # Проверка перед доступом к элементам
+                print(f"Ошибка: Список оригинальных вариантов пустой для вопроса {question['question']}.")
+                raise IndexError("Список оригинальных вариантов пустой.")
             random.shuffle(self.variants)
             self.correct_index = self.variants.index(original_variants[0])
         else:
@@ -328,14 +398,14 @@ class TestWindow(ctk.CTkToplevel):
 
         buttons_frame = tk.Frame(results_frame, bg="white")
         buttons_frame.pack(pady=10)
-
-        export_button = tk.Button(
+        if incorrect_questions:
+            export_button = tk.Button(
             buttons_frame,
             text="Экспортировать неправильные ответы",
             font=("Arial", 14),
             command=lambda: export_incorrect_answers(self.results)
-        )
-        export_button.pack(side="left", padx=10)
+            )
+            export_button.pack(side="left", padx=10)
 
         retry_all_button = tk.Button(
             buttons_frame,
@@ -353,6 +423,15 @@ class TestWindow(ctk.CTkToplevel):
                 command=lambda: self.retry_with_incorrect(incorrect_questions, results_window)
             )
             retry_button.pack(side="left", padx=10)
+
+        if incorrect_results:
+            export_original_format_button = tk.Button(
+            buttons_frame,
+            text="Экспортировать ошибки (в оригинальном формате)",
+            font=("Arial", 14),
+            command=lambda: export_incorrect_questions_as_original_format(self.results)
+            )
+            export_original_format_button.pack(side="left", padx=10)
 
         close_button = tk.Button(
             buttons_frame,
@@ -411,5 +490,14 @@ shuffle_checkbox.grid(row=1, column=1, padx=10, pady=10)
 
 start_button = ctk.CTkButton(main_frame, text="Начать тест", command=start_test)
 start_button.pack(pady=20)
+
+
+start_from_file_button = ctk.CTkButton(
+    main_frame,
+    text="Начать тест из файла с ошибками",
+    command=start_test_with_incorrect_questions
+)
+start_from_file_button.pack(pady=10)
+
 
 root.mainloop()
