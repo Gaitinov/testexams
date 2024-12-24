@@ -240,7 +240,38 @@ class TestWindow(ctk.CTkToplevel):
 
     def show_correct_answer(self):
         correct_answer = self.questions[self.current_question]["variants"][0]
-        messagebox.showinfo("Правильный ответ", f"Правильный ответ: {correct_answer}")
+
+        # Создаем новое окно
+        answer_window = ctk.CTkToplevel(self)
+        answer_window.title("Правильный ответ")
+        answer_window.geometry("500x300")
+        center_window(answer_window, 500, 300)
+
+        # Основной фрейм с закругленными углами
+        frame = ctk.CTkFrame(answer_window, corner_radius=15, fg_color="#F0F0F0")
+        frame.pack(expand=True, fill="both", padx=20, pady=20)
+
+        # Текст правильного ответа
+        answer_label = ctk.CTkLabel(
+            frame,
+            text=correct_answer,
+            font=("Arial", 18, "bold"),
+            wraplength=450,
+            justify="center",
+            text_color="#333333"  # Тёмно-серый цвет для текста
+        )
+        answer_label.pack(expand=True, fill="both", padx=20, pady=40)
+
+        # Функция закрытия окна при нажатии клавиши или клике мыши
+        def close_on_event(event=None):
+            answer_window.destroy()
+
+        # Привязываем события
+        answer_window.bind("<Key>", close_on_event)
+        answer_window.bind("<Button-1>", close_on_event)
+
+        # Устанавливаем фокус
+        answer_window.grab_set()
 
     def start_timer(self):
         def update_timer():
