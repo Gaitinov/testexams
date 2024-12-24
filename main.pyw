@@ -244,8 +244,8 @@ class TestWindow(ctk.CTkToplevel):
         # Создаем новое окно
         answer_window = ctk.CTkToplevel(self)
         answer_window.title("Правильный ответ")
-        answer_window.geometry("500x300")
-        center_window(answer_window, 500, 300)
+        answer_window.geometry("1000x300")
+        center_window(answer_window, 1000, 300)
 
         # Основной фрейм с закругленными углами
         frame = ctk.CTkFrame(answer_window, corner_radius=15, fg_color="#F0F0F0")
