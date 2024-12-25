@@ -237,6 +237,8 @@ class TestWindow(ctk.CTkToplevel):
             height=50
         )
         self.show_answer_button.pack(side="right", padx=10)
+        self.bind("<space>", lambda event: self.show_correct_answer())
+
 
     def show_correct_answer(self):
         correct_answer = self.questions[self.current_question]["variants"][0]
