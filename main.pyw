@@ -2,8 +2,7 @@ import random
 from docx import Document
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import ttk, messagebox
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 
 
 ctk.set_appearance_mode("System")
@@ -32,6 +31,12 @@ root.title("Тестирование")
 root.geometry("900x600")
 center_window(root, 600, 400)
 
+
+def close_app():
+    if messagebox.askyesno("Подтверждение", "Вы действительно хотите выйти?"):
+        root.destroy()
+
+root.protocol("WM_DELETE_WINDOW", close_app)
 
 def start_test_with_incorrect_questions():
     file_path = filedialog.askopenfilename(
@@ -190,33 +195,30 @@ class TestWindow(ctk.CTkToplevel):
         self.time_remaining = time_limit * 60
 
         self.title("Тестирование")
-        self.geometry("1920x1000")
-        self.center_window()
-        self.protocol("WM_DELETE_WINDOW", self.close_test)
+        self.state('zoomed')
 
+        self.protocol("WM_DELETE_WINDOW", self.close_test)
         self.create_widgets()
         self.start_timer()
         self.show_question()
-
-    def center_window(self):
-        center_window(self, 1920, 1000)
 
     def create_widgets(self):
         self.main_frame = ctk.CTkFrame(self, corner_radius=15)
         self.main_frame.pack(expand=True, fill="both", padx=20, pady=20)
 
         self.timer_label = ctk.CTkLabel(self.main_frame, text="", font=("Arial", 20, "bold"), text_color="red")
-        self.timer_label.pack(pady=5)
+        self.timer_label.pack(pady=5, fill="x", expand=True)
 
         self.question_label = ctk.CTkLabel(self.main_frame, text="", wraplength=1000, justify="left",
                                            font=("Arial", 14, "bold"))
-        self.question_label.pack(pady=10)
+        self.question_label.pack(pady=10, fill="x", expand=True)
 
         self.options_frame = ctk.CTkFrame(self.main_frame, corner_radius=10)
-        self.options_frame.pack(pady=10, fill="x")
+        self.options_frame.pack(pady=10, fill="both", expand=True)
 
         buttons_frame = ctk.CTkFrame(self.main_frame, corner_radius=10)
         buttons_frame.pack(pady=10, fill="x", side="bottom")
+
 
         self.next_button = ctk.CTkButton(
             buttons_frame,
@@ -377,6 +379,13 @@ class TestWindow(ctk.CTkToplevel):
         results_window.geometry("1600x900")
         center_window(results_window, 1600, 900)
 
+        def close_results_window():
+            if messagebox.askyesno("Подтверждение", "Вы действительно хотите завершить тестирование?"):
+                results_window.destroy()
+                root.deiconify()
+
+        results_window.protocol("WM_DELETE_WINDOW", close_results_window)
+
         results_frame = tk.Frame(results_window, bg="white", bd=2, relief="groove")
         results_frame.pack(expand=True, fill="both", padx=20, pady=20)
 
@@ -433,10 +442,10 @@ class TestWindow(ctk.CTkToplevel):
         buttons_frame.pack(pady=10)
         if incorrect_questions:
             export_button = tk.Button(
-            buttons_frame,
-            text="Экспортировать неправильные ответы",
-            font=("Arial", 14),
-            command=lambda: export_incorrect_answers(self.results)
+                buttons_frame,
+                text="Экспортировать неправильные ответы",
+                font=("Arial", 14),
+                command=lambda: export_incorrect_answers(self.results)
             )
             export_button.pack(side="left", padx=10)
 
@@ -459,20 +468,12 @@ class TestWindow(ctk.CTkToplevel):
 
         if incorrect_results:
             export_original_format_button = tk.Button(
-            buttons_frame,
-            text="Экспортировать ошибки (в оригинальном формате)",
-            font=("Arial", 14),
-            command=lambda: export_incorrect_questions_as_original_format(self.results)
+                buttons_frame,
+                text="Экспортировать ошибки (в оригинальном формате)",
+                font=("Arial", 14),
+                command=lambda: export_incorrect_questions_as_original_format(self.results)
             )
             export_original_format_button.pack(side="left", padx=10)
-
-        close_button = tk.Button(
-            buttons_frame,
-            text="Закрыть",
-            font=("Arial", 14),
-            command=lambda: self.close_results_window(results_window)
-        )
-        close_button.pack(side="left", padx=10)
 
     def retry_with_all_questions(self, results_window):
         results_window.destroy()
