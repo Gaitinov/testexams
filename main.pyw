@@ -262,19 +262,16 @@ class TestWindow(ctk.CTkToplevel):
             font=("Arial", 18, "bold"),
             wraplength=450,
             justify="center",
-            text_color="#333333"  # Тёмно-серый цвет для текста
+            text_color="#333333"
         )
         answer_label.pack(expand=True, fill="both", padx=20, pady=40)
 
-        # Функция закрытия окна при нажатии клавиши или клике мыши
         def close_on_event(event=None):
             answer_window.destroy()
 
-        # Привязываем события
         answer_window.bind("<Key>", close_on_event)
         answer_window.bind("<Button-1>", close_on_event)
 
-        # Устанавливаем фокус
         answer_window.grab_set()
 
     def start_timer(self):
@@ -374,7 +371,7 @@ class TestWindow(ctk.CTkToplevel):
             for r in incorrect_results
         ]
 
-        results_window = tk.Toplevel(root)
+        results_window = ctk.CTkToplevel(root)
         results_window.title("Результаты теста")
         results_window.geometry("1600x900")
         center_window(results_window, 1600, 900)
@@ -386,71 +383,129 @@ class TestWindow(ctk.CTkToplevel):
 
         results_window.protocol("WM_DELETE_WINDOW", close_results_window)
 
-        results_frame = tk.Frame(results_window, bg="white", bd=2, relief="groove")
+        # Основной фрейм с тенью и закругленными углами
+        results_frame = ctk.CTkFrame(
+            results_window,
+            corner_radius=15,
+            fg_color="#ffffff"
+        )
         results_frame.pack(expand=True, fill="both", padx=20, pady=20)
 
-        title_label = tk.Label(
-            results_frame,
+        # Заголовок с улучшенным стилем
+        title_frame = ctk.CTkFrame(results_frame, fg_color="transparent")
+        title_frame.pack(fill="x", padx=20, pady=(20, 10))
+
+        title_label = ctk.CTkLabel(
+            title_frame,
             text="Результаты теста",
-            font=("Arial", 22, "bold"),
-            bg="white",
-            fg="black"
+            font=("Arial", 30, "bold"),
+            text_color="#1a1a1a"
         )
-        title_label.pack(pady=(20, 20))
+        title_label.pack(pady=10)
 
-        results_text = tk.Text(
-            results_frame,
-            wrap="word",
-            font=("Arial", 16),
-            height=25,
-            width=80,
-            padx=10,
-            pady=10
-        )
-        results_text.pack(expand=True, fill="both", padx=10, pady=10)
-
+        # Статистика
         correct_count = sum(r['is_correct'] for r in self.results)
         total_count = len(self.results)
         percentage = (correct_count / total_count) * 100 if total_count > 0 else 0
 
-        results_text.insert(
-            "end",
-            f"Вы ответили правильно на {correct_count} из {total_count} вопросов ({percentage:.2f}%)\n\n",
-            "header"
+        stats_frame = ctk.CTkFrame(results_frame, fg_color="#f0f0f0", corner_radius=10)
+        stats_frame.pack(fill="x", padx=20, pady=10)
+
+        stats_label = ctk.CTkLabel(
+            stats_frame,
+            text=f"Правильных ответов: {correct_count} из {total_count} ({percentage:.1f}%)",
+            font=("Arial", 24),
+            text_color="#333333"
         )
-        results_text.insert("end", "=" * 50 + "\n\n")
+        stats_label.pack(pady=15)
 
-        for i, result in enumerate(self.results):
-            results_text.insert("end", f"Вопрос {i + 1}: {result['question']}\n", "question")
-            results_text.insert("end", f"  Ваш ответ: {result['selected']}\n", "selected")
-            results_text.insert("end", f"  Правильный ответ: {result['correct']}\n", "correct")
-            if result['is_correct']:
-                results_text.insert("end", "  Результат: Правильно\n\n", "correct_info")
-            else:
-                results_text.insert("end", "  Результат: Неправильно\n\n", "wrong_info")
-            results_text.insert("end", "-" * 50 + "\n\n")
+        # Создаем скроллируемый фрейм для результатов
+        scroll_frame = ctk.CTkScrollableFrame(
+            results_frame,
+            fg_color="#ffffff",
+            corner_radius=10
+        )
+        scroll_frame.pack(expand=True, fill="both", padx=20, pady=10)
 
-        results_text.tag_config("header", foreground="black", font=("Arial", 18, "bold"))
-        results_text.tag_config("question", foreground="black", font=("Arial", 16, "italic"))
-        results_text.tag_config("selected", foreground="blue", font=("Arial", 16))
-        results_text.tag_config("correct", foreground="green", font=("Arial", 16))
-        results_text.tag_config("correct_info", foreground="darkgreen", font=("Arial", 16, "bold"))
-        results_text.tag_config("wrong_info", foreground="red", font=("Arial", 16, "bold"))
-        results_text.configure(state="normal")
-
-        buttons_frame = tk.Frame(results_frame, bg="white")
-        buttons_frame.pack(pady=10)
-        if incorrect_questions:
-            export_button = tk.Button(
-                buttons_frame,
-                text="Экспортировать неправильные ответы",
-                font=("Arial", 14),
-                command=lambda: export_incorrect_answers(self.results)
+        # Добавляем результаты
+        for i, result in enumerate(self.results, 1):
+            # Фрейм для каждого вопроса
+            question_frame = ctk.CTkFrame(
+                scroll_frame,
+                fg_color="#f8f9fa" if result['is_correct'] else "#fff3f3",
+                corner_radius=10
             )
-            export_button.pack(side="left", padx=10)
+            question_frame.pack(fill="x", padx=10, pady=5)
 
-        retry_all_button = tk.Button(
-            buttons_frame,
+            # Номер вопроса
+            question_number = ctk.CTkLabel(
+                question_frame,
+                text=f"Вопрос {i}",
+                font=("Arial", 24, "bold"),
+                text_color="#1a1a1a"
+            )
+            question_number.pack(anchor="w", padx=15, pady=(10, 5))
+
+            # Текст вопроса
+            question_text = ctk.CTkLabel(
+                question_frame,
+                text=result['question'],
+                font=("Arial", 22),
+                wraplength=1400,
+                justify="left",
+                text_color="#333333"
+            )
+            question_text.pack(anchor="w", padx=15, pady=5)
+
+            # Ваш ответ
+            answer_label = ctk.CTkLabel(
+                question_frame,
+                text=f"Ваш ответ: {result['selected']}",
+                font=("Arial", 22),
+                wraplength=1400,
+                justify="left",
+                text_color="#0066cc"
+            )
+            answer_label.pack(anchor="w", padx=15, pady=5)
+
+            # Правильный ответ (показываем только если ответ неверный)
+            if not result['is_correct']:
+                correct_label = ctk.CTkLabel(
+                    question_frame,
+                    text=f"Правильный ответ: {result['correct']}",
+                    font=("Arial", 22),
+                    wraplength=1400,
+                    justify="left",
+                    text_color="#28a745"
+                )
+                correct_label.pack(anchor="w", padx=15, pady=5)
+
+            # Статус
+            status_frame = ctk.CTkFrame(
+                question_frame,
+                fg_color="transparent"
+            )
+            status_frame.pack(fill="x", padx=15, pady=(5, 10))
+
+            status_label = ctk.CTkLabel(
+                status_frame,
+                text="✓ Верно" if result['is_correct'] else "✗ Неверно",
+                font=("Arial", 20, "bold"),
+                text_color="#28a745" if result['is_correct'] else "#dc3545"
+            )
+            status_label.pack(side="left")
+
+        # Кнопки управления
+        # Центрирующий контейнер для кнопок
+        button_container = ctk.CTkFrame(results_frame, fg_color="transparent")
+        button_container.pack(fill="x", padx=20, pady=20)
+
+        # Внутренний фрейм для кнопок, который будет центрирован
+        button_frame = ctk.CTkFrame(button_container, fg_color="transparent")
+        button_frame.pack(expand=True)
+
+        retry_all_button = ctk.CTkButton(
+            button_frame,
             text="Пройти заново (все вопросы)",
             font=("Arial", 14),
             command=lambda: self.retry_with_all_questions(results_window)
@@ -458,22 +513,29 @@ class TestWindow(ctk.CTkToplevel):
         retry_all_button.pack(side="left", padx=10)
 
         if incorrect_questions:
-            retry_button = tk.Button(
-                buttons_frame,
+            retry_incorrect_button = ctk.CTkButton(
+                button_frame,
                 text="Пройти заново (ошибки)",
                 font=("Arial", 14),
                 command=lambda: self.retry_with_incorrect(incorrect_questions, results_window)
             )
-            retry_button.pack(side="left", padx=10)
+            retry_incorrect_button.pack(side="left", padx=10)
 
-        if incorrect_results:
-            export_original_format_button = tk.Button(
-                buttons_frame,
-                text="Экспортировать ошибки (в оригинальном формате)",
+            export_button = ctk.CTkButton(
+                button_frame,
+                text="Экспортировать неправильные ответы",
+                font=("Arial", 14),
+                command=lambda: export_incorrect_answers(self.results)
+            )
+            export_button.pack(side="left", padx=10)
+
+            export_original_button = ctk.CTkButton(
+                button_frame,
+                text="Экспортировать ошибки (ориг. формат)",
                 font=("Arial", 14),
                 command=lambda: export_incorrect_questions_as_original_format(self.results)
             )
-            export_original_format_button.pack(side="left", padx=10)
+            export_original_button.pack(side="left", padx=10)
 
     def retry_with_all_questions(self, results_window):
         results_window.destroy()
