@@ -1,3 +1,5 @@
+import os
+import shutil
 import random
 from docx import Document
 import customtkinter as ctk
@@ -34,9 +36,15 @@ center_window(root, 600, 400)
 
 def close_app():
     if messagebox.askyesno("Подтверждение", "Вы действительно хотите выйти?"):
+        # Удаляем временные изображения
+        temp_img_dir = "temp_images"
+        if os.path.exists(temp_img_dir):
+            shutil.rmtree(temp_img_dir)
         root.destroy()
 
+
 root.protocol("WM_DELETE_WINDOW", close_app)
+
 
 def start_test_with_incorrect_questions():
     file_path = filedialog.askopenfilename(
@@ -67,25 +75,64 @@ def start_test_with_incorrect_questions():
     TestWindow(questions, shuffle_answers_var.get(), 50)
 
 
-
 def parse_questions(file_name):
     document = Document(file_name)
     questions = []
-    current_question = None
-    for paragraph in document.paragraphs:
-        text = paragraph.text.strip()
+    temp_img_dir = "temp_images"
+    if not os.path.exists(temp_img_dir):
+        os.makedirs(temp_img_dir)
+    img_counter = 0
+    paragraphs = document.paragraphs
+    i = 0
+    while i < len(paragraphs):
+        para = paragraphs[i]
+        text = para.text.strip()
         if text.startswith("<question>"):
-            if current_question:
-                questions.append(current_question)
-            current_question = {
-                "question": text.replace("<question>", "").strip(),
-                "variants": [],
-                "correct_index": 0
-            }
-        elif text.startswith("<variant>") and current_question:
-            current_question["variants"].append(text.replace("<variant>", "").strip())
-    if current_question:
-        questions.append(current_question)
+            q_text = text.replace("<question>", "").strip()
+            image_path = None
+            variants = []
+            j = i + 1
+            # Ищем картинку только до первого <variant>
+            while j < len(paragraphs):
+                next_para = paragraphs[j]
+                next_text = next_para.text.strip()
+                if next_text.startswith("<variant>"):
+                    break  # дошли до вариантов — картинки нет
+                for run in next_para.runs:
+                    if 'graphic' in run._element.xml:
+                        # Ищем id изображения в run через findall (python-docx)
+                        drawing = run._element.findall('.//{http://schemas.openxmlformats.org/drawingml/2006/main}blip')
+                        if drawing:
+                            embed_id = drawing[0].attrib.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
+                            if embed_id:
+                                rel = document.part.rels.get(embed_id)
+                                if rel and "image" in rel.reltype:
+                                    img_data = rel.target_part.blob
+                                    img_counter += 1
+                                    image_path = os.path.join(temp_img_dir, f"question_img_{img_counter}.png")
+                                    with open(image_path, "wb") as img_file:
+                                        img_file.write(img_data)
+                                    break
+                if image_path:
+                    break  # нашли картинку
+                j += 1
+            # Теперь собираем варианты
+            while j < len(paragraphs):
+                next_para = paragraphs[j]
+                next_text = next_para.text.strip()
+                if next_text.startswith("<variant>"):
+                    variants.append(next_text.replace("<variant>", "").strip())
+                elif next_text.startswith("<question>"):
+                    break
+                j += 1
+            questions.append({
+                "question": q_text,
+                "variants": variants,
+                "correct_index": 0,
+                "image": image_path
+            })
+            i = j - 1
+        i += 1
     return questions
 
 
@@ -183,7 +230,6 @@ def export_incorrect_answers(results):
         messagebox.showerror("Ошибка", f"Не удалось сохранить файл: {e}")
 
 
-
 class TestWindow(ctk.CTkToplevel):
     def __init__(self, questions, shuffle_answers, time_limit):
         super().__init__()
@@ -213,15 +259,17 @@ class TestWindow(ctk.CTkToplevel):
                                            font=("Arial", 14, "bold"))
         self.question_label.pack(pady=10, fill="x", expand=True)
 
+        self.image_label = ctk.CTkLabel(self.main_frame, text="")
+        self.image_label.pack(pady=5)
+
         self.options_frame = ctk.CTkFrame(self.main_frame, corner_radius=10)
         self.options_frame.pack(pady=10, fill="both", expand=True)
 
-        buttons_frame = ctk.CTkFrame(self.main_frame, corner_radius=10)
-        buttons_frame.pack(pady=10, fill="x", side="bottom")
-
+        self.buttons_frame = ctk.CTkFrame(self.main_frame, corner_radius=10)
+        self.buttons_frame.pack(pady=10, fill="x", side="bottom")
 
         self.next_button = ctk.CTkButton(
-            buttons_frame,
+            self.buttons_frame,
             text="Далее",
             font=("Arial", 16),
             command=self.next_question,
@@ -231,7 +279,7 @@ class TestWindow(ctk.CTkToplevel):
         self.next_button.pack(side="left", padx=10)
 
         self.show_answer_button = ctk.CTkButton(
-            buttons_frame,
+            self.buttons_frame,
             text="Показать ответ",
             font=("Arial", 16),
             command=self.show_correct_answer,
@@ -241,38 +289,10 @@ class TestWindow(ctk.CTkToplevel):
         self.show_answer_button.pack(side="right", padx=10)
         self.bind("<space>", lambda event: self.show_correct_answer())
 
-
     def show_correct_answer(self):
         correct_answer = self.questions[self.current_question]["variants"][0]
-
-        # Создаем новое окно
-        answer_window = ctk.CTkToplevel(self)
-        answer_window.title("Правильный ответ")
-        answer_window.geometry("1000x300")
-        center_window(answer_window, 1000, 300)
-
-        # Основной фрейм с закругленными углами
-        frame = ctk.CTkFrame(answer_window, corner_radius=15, fg_color="#F0F0F0")
-        frame.pack(expand=True, fill="both", padx=20, pady=20)
-
-        # Текст правильного ответа
-        answer_label = ctk.CTkLabel(
-            frame,
-            text=correct_answer,
-            font=("Arial", 18, "bold"),
-            wraplength=450,
-            justify="center",
-            text_color="#333333"
-        )
-        answer_label.pack(expand=True, fill="both", padx=20, pady=40)
-
-        def close_on_event(event=None):
-            answer_window.destroy()
-
-        answer_window.bind("<Key>", close_on_event)
-        answer_window.bind("<Button-1>", close_on_event)
-
-        answer_window.grab_set()
+        messagebox.showinfo("Ответ", f"Правильный ответ: {correct_answer}")
+        self.finish_test()
 
     def start_timer(self):
         def update_timer():
@@ -284,13 +304,99 @@ class TestWindow(ctk.CTkToplevel):
                 self.after(1000, update_timer)
             else:
                 self.finish_test()
-
         update_timer()
 
     def show_question(self):
         question = self.questions[self.current_question]
         question_number = f"Вопрос {self.current_question + 1} из {len(self.questions)}:"
         self.question_label.configure(text=f"{question_number}\n\n{question['question']}", font=("Arial", 18, "bold"))
+
+        # Создаём переменную выбора ответа для каждого вопроса
+        self.selected_answer = ctk.IntVar(value=-1)
+
+        if question.get("image"):
+            import os
+            try:
+                from PIL import Image, ImageTk
+                img_path = question["image"]
+                if img_path and os.path.exists(img_path):
+                    img = Image.open(img_path)
+                    # --- Уменьшенная копия для вопроса ---
+                    # Динамически вычисляем максимальный размер картинки
+                    self.update_idletasks()
+                    frame_width = self.main_frame.winfo_width() or 1000
+                    frame_height = self.main_frame.winfo_height() or 700
+                    max_width = max(int(frame_width * 0.8), 100)
+                    max_height = max(int(frame_height * 0.6), 100)
+                    # Не показываем уменьшенное изображение в вопросе
+                    self.image_label.pack_forget()
+                    # Удаляем старые кнопки 'Открыть картинку' из buttons_frame
+                    for widget in self.buttons_frame.winfo_children():
+                        if isinstance(widget, ctk.CTkButton) and widget.cget("text") == "Открыть картинку":
+                            widget.destroy()
+                    # Кнопка "Открыть картинку"
+                    def open_full_image():
+                        top = ctk.CTkToplevel(self)
+                        top.title("Просмотр изображения")
+                        top.geometry("900x700")
+                        top.lift()
+                        top.attributes('-topmost', True)
+                        # Фрейм и Canvas с прокруткой
+                        frame = ctk.CTkFrame(top)
+                        frame.pack(fill="both", expand=True)
+                        canvas = tk.Canvas(frame, bg="white")
+                        hbar = tk.Scrollbar(frame, orient="horizontal", command=canvas.xview)
+                        vbar = tk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+                        canvas.configure(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
+                        canvas.grid(row=0, column=0, sticky="nsew")
+                        vbar.grid(row=0, column=1, sticky="ns")
+                        hbar.grid(row=1, column=0, sticky="ew")
+                        frame.grid_rowconfigure(0, weight=1)
+                        frame.grid_columnconfigure(0, weight=1)
+                        full_photo = ImageTk.PhotoImage(img)
+                        img_id = canvas.create_image(0, 0, anchor="nw", image=full_photo)
+                        canvas.config(scrollregion=(0, 0, img.width, img.height))
+                        # Сохраняем ссылку, чтобы не удалялось
+                        canvas._img_ref = full_photo
+                    open_btn = ctk.CTkButton(
+                        self.buttons_frame,
+                        text="Открыть картинку",
+                        font=("Arial", 16),
+                        width=200,
+                        height=50,
+                        command=open_full_image
+                    )
+                    open_btn.pack(side="left", padx=10)
+                    # Tooltip подсказка
+                    def _show_tooltip(event):
+                        open_btn.tooltip = tk.Toplevel(open_btn)
+                        open_btn.tooltip.overrideredirect(True)
+                        x = open_btn.winfo_rootx() + 60
+                        y = open_btn.winfo_rooty() + 40
+                        open_btn.tooltip.geometry(f'+{x}+{y}')
+                        label = tk.Label(open_btn.tooltip, text="Открыть изображение в новом окне", bg="#ffffe0", relief="solid", borderwidth=1, font=("Arial", 10))
+                        label.pack()
+                    def _hide_tooltip(event):
+                        if hasattr(open_btn, 'tooltip'):
+                            open_btn.tooltip.destroy()
+                    open_btn.bind("<Enter>", _show_tooltip)
+                    open_btn.bind("<Leave>", _hide_tooltip)
+
+                else:
+                    self.image_label.configure(image=None, text=f"[Изображение не найдено: {img_path}]")
+                    self.image_label.image = None
+                    self.image_label.pack(pady=5)
+            except Exception as e:
+                import traceback
+                error_msg = f"[Ошибка загрузки изображения: {question.get('image')}]\n{str(e)}\n{traceback.format_exc()}"
+                print(error_msg)
+                self.image_label.configure(image=None, text=error_msg)
+                self.image_label.image = None
+                self.image_label.pack(pady=5)
+        else:
+            self.image_label.configure(image=None, text="")
+            self.image_label.image = None
+            self.image_label.pack_forget()
 
         for widget in self.options_frame.winfo_children():
             widget.destroy()
@@ -302,7 +408,7 @@ class TestWindow(ctk.CTkToplevel):
 
         if self.shuffle_answers:
             original_variants = self.variants[:]
-            if not original_variants:  # Проверка перед доступом к элементам
+            if not original_variants:  
                 print(f"Ошибка: Список оригинальных вариантов пустой для вопроса {question['question']}.")
                 raise IndexError("Список оригинальных вариантов пустой.")
             random.shuffle(self.variants)
@@ -343,7 +449,7 @@ class TestWindow(ctk.CTkToplevel):
         is_correct = (selected_index == self.correct_index)
         self.results.append({
             "question": self.questions[self.current_question]["question"],
-            "variants": self.questions[self.current_question]["variants"],  # Сохраняем оригинальные варианты
+            "variants": self.questions[self.current_question]["variants"],  
             "selected": self.variants[selected_index],
             "correct": self.variants[self.correct_index],
             "is_correct": is_correct
@@ -383,7 +489,6 @@ class TestWindow(ctk.CTkToplevel):
 
         results_window.protocol("WM_DELETE_WINDOW", close_results_window)
 
-        # Основной фрейм с тенью и закругленными углами
         results_frame = ctk.CTkFrame(
             results_window,
             corner_radius=15,
@@ -486,6 +591,7 @@ class TestWindow(ctk.CTkToplevel):
                 fg_color="transparent"
             )
             status_frame.pack(fill="x", padx=15, pady=(5, 10))
+
 
             status_label = ctk.CTkLabel(
                 status_frame,
