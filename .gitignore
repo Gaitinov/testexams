@@ -24,3 +24,8 @@ env/
 *.iml
 .idea/
 /output
+
+# PyInstaller
+dist/
+build/
+*.spec
