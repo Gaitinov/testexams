@@ -83,24 +83,82 @@ def parse_questions(file_name):
         os.makedirs(temp_img_dir)
     img_counter = 0
     paragraphs = document.paragraphs
+    
     i = 0
     while i < len(paragraphs):
-        para = paragraphs[i]
-        text = para.text.strip()
-        if text.startswith("<question>"):
-            q_text = text.replace("<question>", "").strip()
-            image_path = None
-            variants = []
-            j = i + 1
-            # Ищем картинку только до первого <variant>
-            while j < len(paragraphs):
-                next_para = paragraphs[j]
-                next_text = next_para.text.strip()
-                if next_text.startswith("<variant>"):
-                    break  # дошли до вариантов — картинки нет
-                for run in next_para.runs:
+        current_para_obj = paragraphs[i]
+        current_para_full_text = current_para_obj.text 
+
+        # Используем lstrip(), чтобы тег считывался, даже если перед ним есть пробелы в начале абзаца
+        if current_para_full_text.lstrip().startswith("<question>"):
+            
+            # Инициализация для текущего вопроса
+            parsed_q_text = ""
+            current_question_variants = []
+            image_path = None # Сбрасываем для каждого нового вопроса
+
+            # --- Обработка текущего абзаца (который содержит <question>) ---
+            # Этот абзац может содержать текст вопроса и варианты ответов.
+            lines_in_current_para = current_para_full_text.splitlines()
+            
+            is_parsing_question_text = False # Флаг, что мы в блоке текста вопроса
+            question_text_lines_buffer = []
+
+            for line_content in lines_in_current_para:
+                stripped_line = line_content.strip()
+                
+                if stripped_line.startswith("<question>"):
+                    # Начало блока вопроса
+                    text_after_tag = stripped_line.replace("<question>", "").strip()
+                    if text_after_tag: # Если текст есть на той же строке, что и тег
+                        question_text_lines_buffer.append(text_after_tag)
+                    is_parsing_question_text = True # Активируем сбор текста вопроса
+                    # Продолжаем, чтобы собрать многострочный текст вопроса, если он есть
+                
+                elif is_parsing_question_text:
+                    # Мы находимся в процессе сбора текста вопроса
+                    if stripped_line.startswith("<variant>"):
+                        # Встретили <variant> внутри блока вопроса - текст вопроса закончился
+                        is_parsing_question_text = False
+                        # Этот вариант принадлежит текущему вопросу
+                        current_question_variants.append(stripped_line.replace("<variant>", "").strip())
+                    elif stripped_line: # Если строка не пустая и не <variant>
+                        # Это продолжение многострочного текста вопроса
+                        question_text_lines_buffer.append(stripped_line)
+                
+                elif stripped_line.startswith("<variant>"):
+                    # Мы уже вышли из блока текста вопроса (или он был однострочным)
+                    # и это строка с вариантом в том же абзаце
+                    current_question_variants.append(stripped_line.replace("<variant>", "").strip())
+            
+            parsed_q_text = "\n".join(question_text_lines_buffer).strip()
+
+            if not parsed_q_text: # Если тег <question> был, но текста вопроса не нашлось
+                i += 1 # Пропускаем этот "пустой" вопрос
+                continue
+
+            # --- Поиск картинки и доп. вариантов в СЛЕДУЮЩИХ абзацах ---
+            # Индекс для начала поиска в следующих абзацах
+            next_para_scan_idx = i + 1
+            
+            # Индекс, с которого начнется сбор доп. вариантов (после картинки или сразу)
+            start_further_variants_idx = next_para_scan_idx
+            
+            # Фаза 1: Поиск картинки в следующих абзацах
+            img_search_runner_idx = next_para_scan_idx
+            while img_search_runner_idx < len(paragraphs):
+                img_candidate_para_obj = paragraphs[img_search_runner_idx]
+                img_candidate_para_text = img_candidate_para_obj.text.strip()
+
+                if img_candidate_para_text.startswith("<variant>") or \
+                   img_candidate_para_text.startswith("<question>"):
+                    # Дошли до вариантов или нового вопроса, картинки для текущего вопроса здесь нет
+                    start_further_variants_idx = img_search_runner_idx
+                    break 
+                
+                found_image_in_para = False
+                for run in img_candidate_para_obj.runs:
                     if 'graphic' in run._element.xml:
-                        # Ищем id изображения в run через findall (python-docx)
                         drawing = run._element.findall('.//{http://schemas.openxmlformats.org/drawingml/2006/main}blip')
                         if drawing:
                             embed_id = drawing[0].attrib.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
@@ -112,27 +170,49 @@ def parse_questions(file_name):
                                     image_path = os.path.join(temp_img_dir, f"question_img_{img_counter}.png")
                                     with open(image_path, "wb") as img_file:
                                         img_file.write(img_data)
-                                    break
-                if image_path:
-                    break  # нашли картинку
-                j += 1
-            # Теперь собираем варианты
-            while j < len(paragraphs):
-                next_para = paragraphs[j]
-                next_text = next_para.text.strip()
-                if next_text.startswith("<variant>"):
-                    variants.append(next_text.replace("<variant>", "").strip())
-                elif next_text.startswith("<question>"):
+                                    found_image_in_para = True
+                                    break # Выход из цикла по runs
+                if found_image_in_para:
+                    start_further_variants_idx = img_search_runner_idx + 1 # Варианты ищем ПОСЛЕ картинки
+                    break # Выход из цикла поиска картинки
+                
+                img_search_runner_idx += 1
+            else: # Цикл поиска картинки завершился без break (дошли до конца документа)
+                start_further_variants_idx = img_search_runner_idx
+
+            # Фаза 2: Сбор ДОПОЛНИТЕЛЬНЫХ вариантов из следующих абзацев
+            # `next_question_or_eof_idx` будет указывать на начало следующего вопроса или конец файла
+            next_question_or_eof_idx = start_further_variants_idx
+            
+            further_variants_runner_idx = start_further_variants_idx
+            while further_variants_runner_idx < len(paragraphs):
+                further_variant_para_obj = paragraphs[further_variants_runner_idx]
+                further_variant_para_text = further_variant_para_obj.text.strip()
+
+                if further_variant_para_text.startswith("<variant>"):
+                    current_question_variants.append(further_variant_para_text.replace("<variant>", "").strip())
+                elif further_variant_para_text.startswith("<question>"):
+                    next_question_or_eof_idx = further_variants_runner_idx # Следующий вопрос найден
                     break
-                j += 1
+                # Игнорируем другие строки между вариантами в последующих абзацах
+                
+                further_variants_runner_idx += 1
+            else: # Цикл сбора доп. вариантов завершился без break (конец документа)
+                next_question_or_eof_idx = further_variants_runner_idx
+            
             questions.append({
-                "question": q_text,
-                "variants": variants,
-                "correct_index": 0,
+                "question": parsed_q_text,
+                "variants": current_question_variants,
+                "correct_index": 0, # По-прежнему предполагаем, что первый вариант правильный
                 "image": image_path
             })
-            i = j - 1
-        i += 1
+            
+            # Устанавливаем `i` так, чтобы следующая итерация основного цикла
+            # началась с абзаца, где был найден следующий тег <question> (или с конца документа)
+            i = next_question_or_eof_idx - 1 
+        
+        i += 1 # Переход к следующему абзацу в основном цикле
+        
     return questions
 
 
@@ -313,6 +393,11 @@ class TestWindow(ctk.CTkToplevel):
         # Создаём переменную выбора ответа для каждого вопроса
         self.selected_answer = ctk.IntVar(value=-1)
 
+        # Удаляем старые кнопки 'Открыть картинку' из buttons_frame при каждом вопросе
+        for widget in self.buttons_frame.winfo_children():
+            if isinstance(widget, ctk.CTkButton) and widget.cget("text") == "Открыть картинку":
+                widget.destroy()
+
         if question.get("image"):
             import os
             try:
@@ -329,10 +414,6 @@ class TestWindow(ctk.CTkToplevel):
                     max_height = max(int(frame_height * 0.6), 100)
                     # Не показываем уменьшенное изображение в вопросе
                     self.image_label.pack_forget()
-                    # Удаляем старые кнопки 'Открыть картинку' из buttons_frame
-                    for widget in self.buttons_frame.winfo_children():
-                        if isinstance(widget, ctk.CTkButton) and widget.cget("text") == "Открыть картинку":
-                            widget.destroy()
                     # Кнопка "Открыть картинку"
                     def open_full_image():
                         top = ctk.CTkToplevel(self)
