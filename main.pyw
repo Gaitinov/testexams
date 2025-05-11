@@ -292,7 +292,6 @@ class TestWindow(ctk.CTkToplevel):
     def show_correct_answer(self):
         correct_answer = self.questions[self.current_question]["variants"][0]
         messagebox.showinfo("Ответ", f"Правильный ответ: {correct_answer}")
-        self.finish_test()
 
     def start_timer(self):
         def update_timer():
