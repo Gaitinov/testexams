@@ -246,37 +246,48 @@ def start_test():
 
 
 def export_incorrect_questions_as_original_format(results):
-    # Фильтруем только неправильные ответы
     incorrect_results = [r for r in results if not r["is_correct"]]
     if not incorrect_results:
         messagebox.showinfo("Информация", "Нет неправильных ответов для экспорта.")
         return
 
-    # Открываем файловый диалог для выбора пути сохранения
     file_path = filedialog.asksaveasfilename(
         defaultextension=".docx",
         filetypes=[("Word Documents", "*.docx"), ("All Files", "*.*")],
         title="Сохранить файл как"
     )
-    if not file_path:  # Если пользователь закрыл диалог без выбора
+    if not file_path:
         return
 
-    # Создаем документ Word
     document = Document()
 
-    # Форматируем вопросы и варианты в оригинальном стиле
     for result in incorrect_results:
         document.add_paragraph(f"<question> {result['question']}")
+
+       
+        image_path = result.get('image') 
+        if image_path and os.path.exists(image_path):
+            try:
+                # from docx.shared import Inches
+                # document.add_picture(image_path, width=Inches(4.0))
+                document.add_picture(image_path)
+                # Можно добавить пустой параграф после картинки для разделения
+                # document.add_paragraph()
+            except Exception as e:
+                print(f"Не удалось добавить картинку {image_path} в документ: {e}")
+                # Можно добавить плейсхолдер в документ
+                document.add_paragraph(f"[Не удалось вставить изображение: {os.path.basename(image_path)}]")
+
         for variant in result["variants"]:
             document.add_paragraph(f"<variant> {variant}")
+        # Добавляем пустой абзац для разделения вопросов, если хотите
+        # document.add_paragraph()
 
-    # Сохраняем файл по указанному пути
     try:
         document.save(file_path)
         messagebox.showinfo("Экспорт завершен", f"Файл успешно сохранен: {file_path}")
     except Exception as e:
         messagebox.showerror("Ошибка", f"Не удалось сохранить файл: {e}")
-
 
 def export_incorrect_answers(results):
     # Фильтруем только неправильные ответы
@@ -528,12 +539,13 @@ class TestWindow(ctk.CTkToplevel):
 
         is_correct = (selected_index == self.correct_index)
         self.results.append({
-            "question": self.questions[self.current_question]["question"],
-            "variants": self.questions[self.current_question]["variants"],  
-            "selected": self.variants[selected_index],
-            "correct": self.variants[self.correct_index],
-            "is_correct": is_correct
-        })
+    "question": self.questions[self.current_question]["question"],
+    "variants": self.questions[self.current_question]["variants"],
+    "selected": self.variants[selected_index],
+    "correct": self.variants[self.correct_index],
+    "is_correct": is_correct,
+    "image": self.questions[self.current_question].get("image")
+})
 
         if is_correct:
             self.score += 4
@@ -549,13 +561,14 @@ class TestWindow(ctk.CTkToplevel):
 
         incorrect_results = [r for r in self.results if not r["is_correct"]]
         incorrect_questions = [
-            {
-                "question": r["question"],
-                "variants": r["variants"],
-                "correct_index": r["variants"].index(r["correct"])
-            }
-            for r in incorrect_results
-        ]
+    {
+        "question": r["question"],
+        "variants": r["variants"],
+        "correct_index": r["variants"].index(r["correct"]),
+        "image": r.get("image")
+    }
+    for r in incorrect_results
+]
 
         results_window = ctk.CTkToplevel(root)
         results_window.title("Результаты теста")
