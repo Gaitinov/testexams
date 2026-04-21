@@ -1,52 +1,53 @@
-# Система тестирования (main.pyw)
+# Testing System (main.pyw)
 
-## Описание
+## Description
 
-Данное приложение предназначено для проведения тестирования с использованием графического интерфейса на базе customtkinter. Вопросы загружаются из файлов формата .docx, а результаты тестирования можно экспортировать.
+This application is designed for conducting tests using a graphical interface based on customtkinter. Questions are loaded from `.docx` files, and test results can be exported.
 
-## Формат файла с вопросами (.docx)
+## Question File Format (.docx)
 
-Файл должен быть в формате Microsoft Word (.docx) и содержать вопросы и варианты ответов с использованием специальных тегов:
+The file must be in Microsoft Word (`.docx`) format and contain questions and answer options using special tags:
 
-- `<question>` — начало нового вопроса
-- `<variant>` — вариант ответа
+* `<question>` — start of a new question
+* `<variant>` — answer option
 
-### Пример:
+### Example:
+
 ```
-<question> Какой язык программирования используется для этого приложения?
+<question> Which programming language is used for this application?
 <variant> Python
 <variant> Java
 <variant> C++
 <variant> JavaScript
-<question> Какой модуль используется для работы с .docx?
+<question> Which module is used to work with .docx?
 <variant> python-docx
 <variant> pandas
 <variant> openpyxl
 <variant> docutils
 ```
 
-Правильный ответ должен быть первым после <question> (или указывается в логике приложения).
+The correct answer should be the first one after `<question>` (or defined in the application logic).
 
-## Изображения
+## Images
 
-Приложение поддерживает отображение изображений в вопросах.
+The application supports displaying images in questions.
 
-**Как добавить изображение:**
+**How to add an image:**
 
-1. Откройте файл `.docx` с вопросами в Microsoft Word.
-2. Добавьте тег `<question>` с текстом вопроса.
-3. _После_ параграфа с тегом `<question>`, но _перед_ любыми `<variant>` вставьте изображение.
+1. Open the `.docx` file with questions in Microsoft Word.
+2. Add a `<question>` tag with the question text.
+3. *After* the paragraph with the `<question>` tag, but *before* any `<variant>`, insert an image.
 
-**Важно:**
+**Important:**
 
-*   Изображение должно быть _встроено_ в `.docx` файл, а не связано с ним.
-*   Поддерживаемые форматы изображений: PNG, JPG, JPEG.
+* The image must be *embedded* in the `.docx` file, not linked.
+* Supported image formats: PNG, JPG, JPEG.
 
-## Возможности
-- Загрузка вопросов из .docx
-- Отображение изображений в вопросах
-- Перемешивание вопросов и ответов
-- Ограничение по времени и количеству вопросов
-- Экспорт неправильных ответов
-- Современный интерфейс (customtkinter)
+## Features
 
+* Load questions from `.docx`
+* Display images in questions
+* Shuffle questions and answers
+* Time and question count limits
+* Export incorrect answers
+* Modern interface (customtkinter)
