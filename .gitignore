@@ -29,3 +29,5 @@ env/
 dist/
 build/
 *.spec
+~$*
+.~lock.*

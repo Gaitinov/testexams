@@ -217,6 +217,14 @@ def parse_questions(file_name):
 
 
 def start_test():
+    file_path = filedialog.askopenfilename(
+        defaultextension=".docx",
+        filetypes=[("Word Documents", "*.docx"), ("All Files", "*.*")],
+        title="Выберите файл с вопросами для теста"
+    )
+    if not file_path:
+        return
+
     try:
         time_limit_str = time_limit_var.get().strip()
         if not time_limit_str.isdigit():
@@ -230,7 +238,7 @@ def start_test():
         if num_questions <= 0:
             raise ValueError("Количество вопросов должно быть положительным числом.")
 
-        questions = parse_questions("URBU.docx")
+        questions = parse_questions(file_path)
         if not questions:
             raise ValueError("В файле нет вопросов или они неверно отформатированы.")
     except ValueError as ve:
