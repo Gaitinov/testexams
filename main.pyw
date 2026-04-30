@@ -109,26 +109,22 @@ def parse_questions(file_name):
                 
                 if stripped_line.startswith("<question>"):
                     # Начало блока вопроса
-                    text_after_tag = stripped_line.replace("<question>", "").strip()
+                    text_after_tag = stripped_line.replace("<question>", "", 1).strip()
+                    text_after_tag = text_after_tag.replace("<question>", "").strip()
                     if text_after_tag: # Если текст есть на той же строке, что и тег
                         question_text_lines_buffer.append(text_after_tag)
                     is_parsing_question_text = True # Активируем сбор текста вопроса
-                    # Продолжаем, чтобы собрать многострочный текст вопроса, если он есть
                 
                 elif is_parsing_question_text:
-                    # Мы находимся в процессе сбора текста вопроса
-                    if stripped_line.startswith("<variant>"):
-                        # Встретили <variant> внутри блока вопроса - текст вопроса закончился
+                    if stripped_line.startswith("<variant>") or stripped_line.startswith("<answer>"):
                         is_parsing_question_text = False
-                        # Этот вариант принадлежит текущему вопросу
-                        current_question_variants.append(stripped_line.replace("<variant>", "").strip())
-                    elif stripped_line: # Если строка не пустая и не <variant>
-                        # Это продолжение многострочного текста вопроса
+                        variant_text = stripped_line.replace("<variant>", "").replace("<answer>", "").strip()
+                        if variant_text:
+                            current_question_variants.append(variant_text)
+                    elif stripped_line:
                         question_text_lines_buffer.append(stripped_line)
                 
                 elif stripped_line.startswith("<variant>"):
-                    # Мы уже вышли из блока текста вопроса (или он был однострочным)
-                    # и это строка с вариантом в том же абзаце
                     current_question_variants.append(stripped_line.replace("<variant>", "").strip())
             
             parsed_q_text = "\n".join(question_text_lines_buffer).strip()
@@ -189,8 +185,10 @@ def parse_questions(file_name):
                 further_variant_para_obj = paragraphs[further_variants_runner_idx]
                 further_variant_para_text = further_variant_para_obj.text.strip()
 
-                if further_variant_para_text.startswith("<variant>"):
-                    current_question_variants.append(further_variant_para_text.replace("<variant>", "").strip())
+                if further_variant_para_text.startswith("<variant>") or further_variant_para_text.startswith("<answer>"):
+                    variant_text = further_variant_para_text.replace("<variant>", "").replace("<answer>", "").strip()
+                    if variant_text:
+                        current_question_variants.append(variant_text)
                 elif further_variant_para_text.startswith("<question>"):
                     next_question_or_eof_idx = further_variants_runner_idx # Следующий вопрос найден
                     break
@@ -381,8 +379,11 @@ class TestWindow(ctk.CTkToplevel):
         self.bind("<space>", lambda event: self.show_correct_answer())
 
     def show_correct_answer(self):
-        correct_answer = self.questions[self.current_question]["variants"][0]
-        messagebox.showinfo("Ответ", f"Правильный ответ: {correct_answer}")
+        if self.questions[self.current_question]["variants"]:
+            correct_answer = self.questions[self.current_question]["variants"][0]
+            messagebox.showinfo("Ответ", f"Правильный ответ: {correct_answer}")
+        else:
+            messagebox.showwarning("Ошибка", "Для этого вопроса не найдены варианты ответа.")
 
     def start_timer(self):
         def update_timer():
@@ -618,11 +619,30 @@ class TestWindow(ctk.CTkToplevel):
         stats_label.pack(pady=15)
 
         # Создаем скроллируемый фрейм для результатов
-        scroll_frame = ctk.CTkScrollableFrame(
-            results_frame,
-            fg_color="#ffffff",
-            corner_radius=10
-        )
+        try:
+            scroll_frame = ctk.CTkScrollableFrame(
+                results_frame,
+                fg_color="#ffffff",
+                corner_radius=10
+            )
+        except AttributeError:
+            # Фолбэк для старых версий customtkinter
+            scroll_frame = ctk.CTkFrame(results_frame, fg_color="#ffffff")
+            canvas = tk.Canvas(scroll_frame, bg="#ffffff", highlightthickness=0)
+            scrollbar = tk.Scrollbar(scroll_frame, orient="vertical", command=canvas.yview)
+            scrollable_content = ctk.CTkFrame(canvas, fg_color="#ffffff")
+
+            scrollable_content.bind(
+                "<Configure>",
+                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            )
+            canvas.create_window((0, 0), window=scrollable_content, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set)
+
+            scrollbar.pack(side="right", fill="y")
+            canvas.pack(side="left", fill="both", expand=True)
+            scroll_frame = scrollable_content
+
         scroll_frame.pack(expand=True, fill="both", padx=20, pady=10)
 
         # Добавляем результаты
