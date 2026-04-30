@@ -29,5 +29,6 @@ env/
 dist/
 build/
 *.spec
+
+# Temp files of Microsoft Office
 ~$*
-.~lock.*
