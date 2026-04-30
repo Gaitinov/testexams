@@ -124,8 +124,10 @@ def parse_questions(file_name):
                     elif stripped_line:
                         question_text_lines_buffer.append(stripped_line)
                 
-                elif stripped_line.startswith("<variant>"):
-                    current_question_variants.append(stripped_line.replace("<variant>", "").strip())
+                elif stripped_line.startswith("<variant>") or stripped_line.startswith("<answer>"):
+                    variant_text = stripped_line.replace("<variant>", "").replace("<answer>", "").strip()
+                    if variant_text:
+                        current_question_variants.append(variant_text)
             
             parsed_q_text = "\n".join(question_text_lines_buffer).strip()
 
